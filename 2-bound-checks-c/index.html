@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+    <title>
+#2 - Bound Checks in C &middot; Tangled Bits
+</title>
+    <link rel="stylesheet" href="https://tangledbits.net/slim.css">
+    <link href='https://fonts.googleapis.com/css?family=Source+Sans+Pro:400,700|Source+Code+Pro' rel='stylesheet'
+        type='text/css'>
+    
+    
+    <script
+        data-goatcounter="https://charlycst.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"
+    >
+    </script>
+    
+    
+</head>
+
+<body>
+    <div class="container">
+        
+<div class="header">
+    <h1 class="site-title"><a href="https:&#x2F;&#x2F;tangledbits.net">Tangled Bits</a></h1>
+    <p class="site-tagline">byte-sized news from the system world</p>
+</div>
+
+        <div class="content">
+            <div class="posts">
+                
+<div class="post">
+    
+    
+<h2 class="post-title"><a href="https:&#x2F;&#x2F;tangledbits.net&#x2F;2-bound-checks-c&#x2F;">#2 - Bound Checks in C</a></h2>
+<div class="post-header">
+    
+    <span class="post-date">June 22, 2023</span>
+    
+    
+</div>
+
+    <div class="post-content">
+        <p>In this second issue we are taking a look at an interesting bound check
+extension proposal for C, the new Rust release, and enlightening article about
+the history of SAT solver. Finally, this week HotOS is taking place in
+providence.</p>
+<h2 id="bound-checking-in-c">Bound Checking in C</h2>
+<p>A new RFC for adding bound checks to C has <a href="https://discourse.llvm.org/t/rfc-enforcing-bounds-safety-in-c-fbounds-safety/70854">landed in LLVM</a>.
+C is famous for being memory unsafe, which is the cause of 70% of bugs in both
+<a href="https://www.zdnet.com/article/chrome-70-of-all-security-bugs-are-memory-safety-issues/">Chrome</a>
+and <a href="https://www.zdnet.com/article/microsoft-70-percent-of-all-security-bugs-are-memory-safety-issues/">Microsoft's
+products</a>,
+adding bound checks to C is an attempt to eliminate some of those bugs.</p>
+<p>The RFC proposes two extensions: an ABI compatible <code>__counted_by</code> annotation,
+and an ABI breaking wide pointer. The <code>__counted_by</code> annotation has the
+advantage of being compatible with existing code, and easy to ignore for
+compilers that do not support the extension, but requires manual annotation in
+the function signature. The idea is pretty simple: when a function takes a
+pointer and a maximum size, the annotation tells the compiler that the second
+parameter should be used for bound checks. Here is an example of using the
+extension (taken from the RFC):</p>
+<pre data-lang="c" style="background-color:#2b303b;color:#c0c5ce;" class="language-c "><code class="language-c" data-lang="c"><span style="color:#b48ead;">void </span><span style="color:#8fa1b3;">fill_array_with_indices</span><span>(</span><span style="color:#b48ead;">int </span><span>*</span><span style="color:#bf616a;">__counted_by</span><span>(count) </span><span style="color:#bf616a;">p</span><span>, size_t </span><span style="color:#bf616a;">count</span><span>) {  
+</span><span>    </span><span style="color:#65737e;">// off-by-one error   
+</span><span>    </span><span style="color:#b48ead;">for </span><span>(size_t i = </span><span style="color:#d08770;">0</span><span>; i &lt;= count; ++i)  
+</span><span>        p[i] = i;  
+</span><span>}
+</span></code></pre>
+<p>Because retro-fitting an entire app with manual annotation can be tedious, the
+RFC also propose to introduce wide pointers. A wide pointer is simply a pointer
+with a bound, Rust already <a href="https://doc.rust-lang.org/nomicon/exotic-sizes.html#dynamically-sized-types-dsts">use them
+extensively</a> for bound checking of types with dynamic sizes.
+This extension, however, is ABI breaking. Only future will tell if this is an
+acceptable trade-off for adding a bit more of memory safety to C.</p>
+<p>Another interesting proposal in this RFC is sentinel-delimited arrays. C often
+use the null byte as a sentinel, for instance in strings, rather than explicitly
+passing a size. The RFC propose another annotation that let the compiler know
+that a special value, the sentinel, marks the end of the array. This in turn can
+be used for bound-checking. Interestingly, Zig <a href="https://ziglang.org/documentation/0.10.1/#Sentinel-Terminated-Arrays">already has sentinel-delimited
+arrays</a>
+and can use the sentinel it is great to see proposals to port it to C.</p>
+<h2 id="rust-1-70">Rust 1.70</h2>
+<p>Rust 1.70 <a href="https://blog.rust-lang.org/2023/06/01/Rust-1.70.0.html">has been released</a>.
+The biggest change from a user perspective is the switch to a sparse index for
+<code>crate.io</code>. Before, cargo used to fetch and update the whole index once in a
+while, an operation that can take minutes. With this change, only part of the
+index is required, making the installation of crates much faster.</p>
+<p>Another interesting change is the introduction of <code>OnceCell</code> and <code>OnceLock</code>.
+Those two construct are used for holding data that must be initialized once.
+Initialization of global data is a recurrent problem in Rust, so it is good to
+have a solution backed-in the standard library.</p>
+<p>Unfortunately, <code>OnceLock</code> is not available for <code>no_std</code> targets (because it uses
+a lock), and <code>OnceCell</code> is <code>!Sync</code> (not sync), meaning that it can't shared by
+threads or being used as a static. Therefore, bare metal programmers will have
+to continue to rely on external crates, such as <a href="https://crates.io/crates/lazy_static">lazy_static</a> for global data initialization. </p>
+<h2 id="the-silent-r-evolution-of-sat">The Silent (R)evolution of SAT</h2>
+<p>Last week I stumbled upon a very interesting in the Communications of the ACM:
+<a href="https://cacm.acm.org/magazines/2023/6/273222-the-silent-revolution-of-sat/pdf">the silent (r)evolution of
+SAT</a>.
+The article is a good introduction to SAT solvers, and explains the evolutions
+that happened in the field during those last few decades.</p>
+<p>SAT solvers are playing an increasingly important role in systems. Indeed, SAT
+solvers are a crucial building block for formal verification, but it is also
+increasingly common to have an SAT solver as an integral part of a system.
+A notable example is AWS, which rely on SAT solvers for both internal
+verification and <a href="https://www.amazon.science/blog/a-billion-smt-queries-a-day">customer facing
+products</a>.
+Maybe SAT solvers will soon become an indispensable tool for system designers?</p>
+<h2 id="hotos-23">HotOS'23</h2>
+<p>The <a href="https://sigops.org/s/conferences/hotos/2023/">HotOS workshop</a> is taking
+place this week, with <a href="https://sigops.org/s/conferences/hotos/2023/zoom.html">free remote
+attendance</a>.
+HotOS is a workshop for sharing new ideas about OS research, the program is
+available <a href="ttps://sigops.org/s/conferences/hotos/2023/program.html">here</a> and
+spawns a wide range of subjects from OS design to hardware, security,
+application development, caching, and more.
+I will be presenting some of my work there on <a href="https://sigops.org/s/conferences/hotos/2023/papers/castes.pdf">Creating Trust by Abolishing
+Hierarchies</a></p>
+
+    </div>
+    
+</div>
+
+            </div>
+            
+        </div>
+        
+<div class="footer">
+    <p><a href="https://tangledbits.net/tb/about/">About</a> - <a href="https://tangledbits.net/tb/subscribe/">Get notified</a></p>
+</div>
+
+    </div>
+    <script src="https://tangledbits.net/js/slim.js"></script>
+    
+</body>
+
+</html>

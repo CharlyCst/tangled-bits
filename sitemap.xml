@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+    <url>
+        <loc>https://tangledbits.net/</loc>
+    </url>
+    <url>
+        <loc>https://tangledbits.net/1-x86s/</loc>
+        <lastmod>2023-05-27</lastmod>
+    </url>
+    <url>
+        <loc>https://tangledbits.net/2-bound-checks-c/</loc>
+        <lastmod>2023-06-22</lastmod>
+    </url>
+    <url>
+        <loc>https://tangledbits.net/tb/</loc>
+    </url>
+    <url>
+        <loc>https://tangledbits.net/tb/about/</loc>
+    </url>
+    <url>
+        <loc>https://tangledbits.net/tb/subscribe/</loc>
+    </url>
+</urlset>
